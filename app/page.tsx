@@ -1,113 +1,189 @@
-import Image from 'next/image'
+"use client";
+import { useState } from "react";
+import { generateKeyPair, encryptWithPublicKey, decryptWithPrivateKey } from "../utils/rsa";
+
+function findRelativePrimes(n: number): number[] {
+  const relativePrimes = [];
+  for (let i = 2; i < n; i++) {
+    if (gcd(i, n) === 1) {
+      relativePrimes.push(i);
+    }
+  }
+  return relativePrimes;
+}
+
+function gcd(a: number, b: number): number {
+  if (b === 0) {
+    return a;
+  }
+  return gcd(b, a % b);
+}
 
 export default function Home() {
+  const [p, setP] = useState<string>("");
+  const [q, setQ] = useState<string>("");
+  const [selectedE, setSelectedE] = useState<string>("");
+  const [publicKey, setPublicKey] = useState<string>("");
+  const [privateKey, setPrivateKey] = useState<string>("");
+  const [inputText, setInputText] = useState<string>("");
+  const [encryptedText, setEncryptedText] = useState<string>("");
+  const [decryptedText, setDecryptedText] = useState<string>("");
+  const [encryptionSteps, setEncryptionSteps] = useState<string>("");
+  const [decryptionSteps, setDecryptionSteps] = useState<string>("");
+
+  const handleGenerateKeys = () => {
+    const parsedP = parseInt(p, 10);
+    const parsedQ = parseInt(q, 10);
+    let parsedE: number | undefined = undefined;
+
+    if (selectedE.trim() !== "") {
+      parsedE = parseInt(selectedE, 10);
+    }
+
+    if (!isNaN(parsedP) && !isNaN(parsedQ) && parsedP > 1 && parsedQ > 1) {
+      const { publicKey, privateKey } = generateKeyPair(parsedP, parsedQ, parsedE);
+      setPublicKey(publicKey);
+      setPrivateKey(privateKey);
+    } else {
+      alert("Please enter valid prime numbers for p and q.");
+    }
+  };
+  const handleEncrypt = () => {
+    const decimalValue = parseInt(inputText, 10);
+
+    if (!isNaN(decimalValue)) {
+      const encrypted = encryptWithPublicKey(decimalValue, publicKey);
+      setEncryptedText(encrypted.toString());
+      const publicKeyParts = publicKey.replace(/\(|\)/g, "").split(",");
+      const eIndex = 0;
+      const modulusIndex = 1;
+
+      let e = parseInt(publicKeyParts[eIndex].trim());
+      let steps = `C = ${inputText}^${e} mod N\n`;
+
+      let base = parseInt(inputText);
+      let modulus = parseInt(publicKeyParts[modulusIndex].trim());
+
+      let result = 1;
+      let currentStep = `${base}^${e} mod ${modulus}`;
+      steps += `${currentStep} = `;
+
+      while (e > 0) {
+        if (e % 2 === 1) {
+          result = (result * base) % modulus;
+        }
+        base = (base * base) % modulus;
+        e = Math.floor(e / 2);
+
+        if (e > 0) {
+          currentStep = `${base}^${e} mod ${modulus}`;
+          steps += `(${currentStep}) * `;
+        } else {
+          steps += `(${currentStep})`;
+        }
+      }
+
+      steps += ` = ${result}`;
+
+      setEncryptionSteps(steps);
+      setDecryptedText("");
+    } else {
+      alert("Please enter a valid decimal number.");
+    }
+  };
+
+  const handleDecrypt = () => {
+    const encryptedValue = parseInt(encryptedText, 10);
+
+    if (!isNaN(encryptedValue)) {
+      const decrypted = decryptWithPrivateKey(encryptedValue, privateKey);
+      let steps = `C = ${encryptedValue}\n`;
+      steps += `P = ${encryptedValue}^d mod N\n`;
+      steps += `= ${encryptedValue}^${privateKey.split(",")[0]} mod ${privateKey.split(",")[1]}\n`;
+      steps += `= ${decrypted}`;
+
+      setDecryptionSteps(steps);
+      setDecryptedText(decrypted.toString());
+    } else {
+      alert("Please enter a valid encrypted decimal number.");
+    }
+  };
+  const relativePrimesPQ = findRelativePrimes((parseInt(p) - 1) * (parseInt(q) - 1));
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+      <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">Need some RSA honey?</h1>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+        <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-md">
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">P:</label>
+            <input type="text" placeholder="Enter prime number P" className="w-full p-2 rounded border text-black focus:outline-none focus:ring focus:border-blue-500" value={p} onChange={(e) => setP(e.target.value)} />
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Q:</label>
+            <input type="text" placeholder="Enter prime number Q" className="w-full p-2 rounded border text-black focus:outline-none focus:ring focus:border-blue-500" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">e:</label>
+            <select className="w-full p-2 rounded border text-black appearance-none" value={selectedE} onChange={(e) => setSelectedE(e.target.value)} style={{ zIndex: 10 }}>
+              <option value="">Select e (default = underlimit cooprime)</option>
+              {relativePrimesPQ.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded mb-4 w-full transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring focus:border-blue-300"
+            onClick={handleGenerateKeys}
           >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+            Generate Keys
+          </button>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Public Key:</label>
+            <textarea className="w-full bg-gray-100 p-2 rounded border text-black" value={publicKey} readOnly></textarea>
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Private Key (d):</label>
+            <textarea className="w-full bg-gray-100 p-2 rounded border text-black" value={privateKey} readOnly></textarea>
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Enter Number to Encrypt:</label>
+            <input type="text" placeholder="Number to encrypt" className="w-full p-2 rounded border text-black focus:outline-none focus:ring focus:border-blue-500" value={inputText} onChange={(e) => setInputText(e.target.value)} />
+          </div>
+          <button
+            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded mb-4 w-full transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring focus:border-green-300"
+            onClick={handleEncrypt}
+          >
+            Encrypt
+          </button>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Encrypted:</label>
+            <textarea placeholder="Give me some encrypted RSA please :(" className="w-full p-2 rounded border text-black" value={encryptedText} onChange={(e) => setEncryptedText(e.target.value)}></textarea>
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Encryption Steps:</label>
+            <textarea className="w-full bg-gray-100 p-2 rounded border text-black" value={encryptionSteps} readOnly></textarea>
+          </div>
+          <button
+            className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-2 px-4 rounded mb-4 w-full transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring focus:border-yellow-300"
+            onClick={handleDecrypt}
+          >
+            Decrypt
+          </button>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Decrypted:</label>
+            <textarea className="w-full bg-gray-100 p-2 rounded border text-black" value={decryptedText} readOnly></textarea>
+          </div>
+          <div className="mb-4">
+            <label className="block mb-1 text-gray-600">Decryption Steps:</label>
+            <textarea className="w-full bg-gray-100 p-2 rounded border text-black" value={decryptionSteps} readOnly></textarea>
+          </div>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+      <footer className="text-center py-4 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} By zakydfls - jocelynflores. All Rights Reserved.</p>
+      </footer>
+    </div>
+  );
 }
